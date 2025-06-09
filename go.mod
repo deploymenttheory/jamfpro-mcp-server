@@ -1,4 +1,4 @@
-module deploymenttheory/jamfpro-mcp-server
+module github.com/deploymenttheory/jamfpro-mcp-server
 
 go 1.24.3
 
