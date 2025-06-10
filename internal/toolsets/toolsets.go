@@ -4,11 +4,85 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/deploymenttheory/go-api-sdk-jamfpro/sdk/jamfpro"
 	"github.com/deploymenttheory/jamfpro-mcp-server/internal/mcp"
 	"go.uber.org/zap"
 )
+
+// JamfProClient defines the interface for Jamf Pro API client
+// This allows for dependency injection and easier testing
+type JamfProClient interface {
+	// Common methods
+	GetJamfProInformation() (*jamfpro.ResponseJamfProInformation, error)
+
+	// Computer methods (Classic API)
+	GetComputers() (*jamfpro.ResponseComputersList, error)
+	GetComputerByID(id string) (*jamfpro.ResponseComputer, error)
+	GetComputerByName(name string) (*jamfpro.ResponseComputer, error)
+	GetComputerGroups() (*jamfpro.ResponseComputerGroupsList, error)
+	GetComputerGroupByID(id string) (*jamfpro.ResponseComputerGroup, error)
+	CreateComputer(computer jamfpro.ResponseComputer) (*jamfpro.ResponseComputer, error)
+	UpdateComputerByID(id string, computer jamfpro.ResponseComputer) (*jamfpro.ResponseComputer, error)
+	UpdateComputerByName(name string, computer jamfpro.ResponseComputer) (*jamfpro.ResponseComputer, error)
+	DeleteComputerByID(id string) error
+	DeleteComputerByName(name string) error
+
+	// Computer Inventory methods (Pro API)
+	GetComputersInventory(params url.Values) (*jamfpro.ResponseComputersInventory, error)
+	GetComputerInventoryByID(id string) (*jamfpro.ResourceComputerInventory, error)
+	GetComputerInventoryByName(name string) (*jamfpro.ResourceComputerInventory, error)
+	UpdateComputerInventoryByID(id string, inventory *jamfpro.ResourceComputerInventory) (*jamfpro.ResourceComputerInventory, error)
+	DeleteComputerInventoryByID(id string) error
+
+	// FileVault methods
+	GetComputersFileVaultInventory(params url.Values) (*jamfpro.ResponseComputersFileVaultInventory, error)
+	GetComputerFileVaultInventoryByID(id string) (*jamfpro.ResourceComputerFileVaultInventory, error)
+	GetComputerRecoveryLockPasswordByID(id string) (*jamfpro.ResponseComputerRecoveryLockPassword, error)
+
+	// Device management methods
+	RemoveComputerMDMProfile(id string) (*jamfpro.ResponseComputerMDMCommand, error)
+	EraseComputerByID(id string, request jamfpro.RequestEraseDeviceComputer) error
+
+	// Attachment methods
+	UploadAttachmentAndAssignToComputerByID(computerID string, filePaths []string) (*jamfpro.ResponseComputerAttachment, error)
+	DeleteAttachmentByIDAndComputerID(computerID, attachmentID string) error
+
+	// Mobile Device methods (Classic API)
+	GetMobileDevices() (*jamfpro.ResponseMobileDeviceList, error)
+	GetMobileDeviceByID(id string) (*jamfpro.ResourceMobileDevice, error)
+	GetMobileDeviceByName(name string) (*jamfpro.ResourceMobileDevice, error)
+	GetMobileDeviceGroups() (*jamfpro.ResponseMobileDeviceGroupsList, error)
+	GetMobileDeviceGroupByID(id string) (*jamfpro.ResponseMobileDeviceGroup, error)
+	GetMobileDeviceApplications() (*jamfpro.ResponseMobileDeviceApplicationsList, error)
+	GetMobileDeviceConfigurationProfiles() (*jamfpro.ResponseMobileDeviceConfigurationProfilesList, error)
+	CreateMobileDevice(device *jamfpro.ResourceMobileDevice) (*jamfpro.ResourceMobileDevice, error)
+	UpdateMobileDeviceByID(id string, device *jamfpro.ResourceMobileDevice) (*jamfpro.ResourceMobileDevice, error)
+	DeleteMobileDeviceByID(id string) error
+
+	// Policies methods (Classic API) - FIXED: Corrected return types
+	GetPolicies() (*jamfpro.ResponsePoliciesList, error)
+	GetPolicyByID(id string) (*jamfpro.ResourcePolicy, error)
+	GetPolicyByName(name string) (*jamfpro.ResourcePolicy, error)
+	GetPolicyByCategory(category string) (*jamfpro.ResponsePoliciesList, error)
+	GetPoliciesByType(createdBy string) (*jamfpro.ResponsePoliciesList, error)
+	CreatePolicy(policy *jamfpro.ResourcePolicy) (*jamfpro.ResponsePolicyCreateAndUpdate, error)
+	UpdatePolicyByID(id string, policy *jamfpro.ResourcePolicy) (*jamfpro.ResponsePolicyCreateAndUpdate, error)
+	UpdatePolicyByName(name string, policy *jamfpro.ResourcePolicy) (*jamfpro.ResponsePolicyCreateAndUpdate, error)
+	DeletePolicyByID(id string) error
+	DeletePolicyByName(name string) error
+
+	// Scripts methods (Pro API)
+	GetScripts(params ...url.Values) (*jamfpro.ResponseScriptsList, error)
+	GetScriptByID(id string) (*jamfpro.ResourceScript, error)
+	GetScriptByName(name string) (*jamfpro.ResourceScript, error)
+	CreateScript(script *jamfpro.ResourceScript) (*jamfpro.ResponseScriptCreate, error)
+	UpdateScriptByID(id string, script *jamfpro.ResourceScript) (*jamfpro.ResourceScript, error)
+	UpdateScriptByName(name string, script *jamfpro.ResourceScript) (*jamfpro.ResourceScript, error)
+	DeleteScriptByID(id string) error
+	DeleteScriptByName(name string) error
+}
 
 // Toolset represents a collection of related tools
 type Toolset interface {
@@ -29,13 +103,13 @@ type Toolset interface {
 type BaseToolset struct {
 	name        string
 	description string
-	client      *jamfpro.Client
+	client      JamfProClient
 	logger      *zap.Logger
 	tools       map[string]mcp.Tool
 }
 
 // NewBaseToolset creates a new base toolset
-func NewBaseToolset(name, description string, client *jamfpro.Client, logger *zap.Logger) *BaseToolset {
+func NewBaseToolset(name, description string, client JamfProClient, logger *zap.Logger) *BaseToolset {
 	return &BaseToolset{
 		name:        name,
 		description: description,
@@ -70,7 +144,7 @@ func (b *BaseToolset) AddTool(tool mcp.Tool) {
 }
 
 // GetClient returns the Jamf Pro client
-func (b *BaseToolset) GetClient() *jamfpro.Client {
+func (b *BaseToolset) GetClient() JamfProClient {
 	return b.client
 }
 
@@ -81,12 +155,12 @@ func (b *BaseToolset) GetLogger() *zap.Logger {
 
 // Factory creates toolsets
 type Factory struct {
-	client *jamfpro.Client
+	client JamfProClient
 	logger *zap.Logger
 }
 
 // NewFactory creates a new toolset factory
-func NewFactory(client *jamfpro.Client, logger *zap.Logger) *Factory {
+func NewFactory(client JamfProClient, logger *zap.Logger) *Factory {
 	return &Factory{
 		client: client,
 		logger: logger,
@@ -96,25 +170,16 @@ func NewFactory(client *jamfpro.Client, logger *zap.Logger) *Factory {
 // CreateToolset creates a toolset by name
 func (f *Factory) CreateToolset(name string) (Toolset, error) {
 	switch name {
-	// ========== IMPLEMENTED TOOLSETS ==========
-
-	// Classic API - Computers (computer operations)
-	case "computers":
-		return NewComputersToolset(f.client, f.logger), nil
-
-	// Pro API - Computer Inventory (detailed inventory management)
-	case "computer-inventory":
-		return NewComputerInventoryToolset(f.client, f.logger), nil
-
-	// Pro API - Scripts (script management)
-	case "scripts":
-		return NewScriptsToolset(f.client, f.logger), nil
 
 	// ========== DEVICE MANAGEMENT ==========
 	// Based on jamfproapi_* and classicapi_* files
 
+	case "computers":
+		return NewComputersToolset(f.client, f.logger), nil
+	case "computer-inventory":
+		return NewComputerInventoryToolset(f.client, f.logger), nil
 	case "mobile-devices":
-		return nil, fmt.Errorf("mobile-devices toolset not yet implemented - based on classicapi_mobile_devices.go")
+		return NewMobileDevicesToolset(f.client, f.logger), nil
 	case "mobile-device-inventory":
 		return nil, fmt.Errorf("mobile-device-inventory toolset not yet implemented - based on jamfproapi_mobile_device_inventory.go")
 	case "computer-groups":
@@ -129,7 +194,7 @@ func (f *Factory) CreateToolset(name string) (Toolset, error) {
 	// ========== POLICIES & CONFIGURATION ==========
 
 	case "policies":
-		return nil, fmt.Errorf("policies toolset not yet implemented - based on classicapi_policies.go")
+		return NewPoliciesToolset(f.client, f.logger), nil
 	case "configuration-profiles":
 		return nil, fmt.Errorf("configuration-profiles toolset not yet implemented - based on classicapi_os_x_configuration_profiles.go")
 	case "mobile-device-configuration-profiles":
@@ -162,8 +227,10 @@ func (f *Factory) CreateToolset(name string) (Toolset, error) {
 	case "api-authentication":
 		return nil, fmt.Errorf("api-authentication toolset not yet implemented - based on jamfproapi_api_authentication.go")
 
-	// ========== APPLICATIONS & SOFTWARE ==========
+		// ========== APPLICATIONS & SOFTWARE ==========
 
+	case "scripts":
+		return NewScriptsToolset(f.client, f.logger), nil
 	case "mobile-device-applications":
 		return nil, fmt.Errorf("mobile-device-applications toolset not yet implemented - based on classicapi_mobile_device_applications.go")
 	case "mac-applications":
@@ -430,7 +497,7 @@ func GetIntArgument(args map[string]interface{}, key string, required bool) (int
 	case float64:
 		return int(v), nil
 	case string:
-		// Try to parse string as int
+		// Try to parse string as int - FIXED: Don't allow string conversion for int args
 		if v == "" && !required {
 			return 0, nil
 		}
@@ -499,16 +566,22 @@ func FormatJSONResponse(data interface{}) (string, error) {
 	return string(jsonBytes), nil
 }
 
-// FormatListResponse formats a list response with count information
+// FormatListResponse formats a list response with count information - FIXED: Better type handling
 func FormatListResponse(items interface{}, itemType string) (string, error) {
 	jsonBytes, err := json.MarshalIndent(items, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to format response as JSON: %w", err)
 	}
 
-	// Try to get count if it's a slice
+	// Try to get count from different response types
 	count := "unknown"
-	if slice, ok := items.([]interface{}); ok {
+
+	// Handle different response types that might have count fields
+	if respWithCount, ok := items.(interface{ GetSize() int }); ok {
+		count = fmt.Sprintf("%d", respWithCount.GetSize())
+	} else if respWithTotal, ok := items.(interface{ GetTotalCount() int }); ok {
+		count = fmt.Sprintf("%d", respWithTotal.GetTotalCount())
+	} else if slice, ok := items.([]interface{}); ok {
 		count = fmt.Sprintf("%d", len(slice))
 	}
 

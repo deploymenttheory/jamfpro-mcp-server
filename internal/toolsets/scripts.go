@@ -17,7 +17,7 @@ type ScriptsToolset struct {
 }
 
 // NewScriptsToolset creates a new scripts toolset
-func NewScriptsToolset(client *jamfpro.Client, logger *zap.Logger) *ScriptsToolset {
+func NewScriptsToolset(client JamfProClient, logger *zap.Logger) *ScriptsToolset {
 	base := NewBaseToolset(
 		"scripts",
 		"Tools for managing scripts in Jamf Pro using the Pro API, including full CRUD operations and script parameter management",
@@ -370,6 +370,17 @@ func (s *ScriptsToolset) addTools() {
 			Required: []string{"name"},
 		},
 	})
+
+	// Get Script Template
+	s.AddTool(mcp.Tool{
+		Name:        "get_script_template",
+		Description: "Get a reference template for a script resource showing all available fields",
+		InputSchema: mcp.ToolInputSchema{
+			Type:       "object",
+			Properties: map[string]interface{}{},
+			Required:   []string{},
+		},
+	})
 }
 
 // ExecuteTool executes a script-related tool
@@ -393,6 +404,8 @@ func (s *ScriptsToolset) ExecuteTool(ctx context.Context, toolName string, argum
 		return s.deleteScriptByID(ctx, arguments)
 	case "delete_script_by_name":
 		return s.deleteScriptByName(ctx, arguments)
+	case "get_script_template":
+		return s.getScriptTemplate(ctx)
 	default:
 		return "", fmt.Errorf("unknown tool: %s", toolName)
 	}
@@ -554,7 +567,6 @@ func (s *ScriptsToolset) updateScriptByID(ctx context.Context, args map[string]i
 		return "", err
 	}
 
-	// Build update object with only provided fields
 	scriptUpdate := &jamfpro.ResourceScript{}
 
 	if name, _ := GetStringArgument(args, "name", false); name != "" {
@@ -627,10 +639,8 @@ func (s *ScriptsToolset) updateScriptByName(ctx context.Context, args map[string
 		return "", err
 	}
 
-	// Build update object with only provided fields
 	scriptUpdate := &jamfpro.ResourceScript{}
 
-	// Handle new name if provided
 	if newName, _ := GetStringArgument(args, "new_name", false); newName != "" {
 		scriptUpdate.Name = newName
 	}
@@ -721,4 +731,34 @@ func (s *ScriptsToolset) deleteScriptByName(ctx context.Context, args map[string
 	}
 
 	return fmt.Sprintf("Successfully deleted script with name '%s'", name), nil
+}
+
+// GetScriptTemplate returns an example template of a script resource
+func (s *ScriptsToolset) GetScriptTemplate() *jamfpro.ResourceScript {
+	return &jamfpro.ResourceScript{
+		Name:           "Example Script",
+		CategoryName:   "Scripts",
+		Info:           "This is an example script that demonstrates all available fields",
+		Notes:          "These are example notes for the script",
+		OSRequirements: "macOS 10.14.0 or later",
+		Priority:       "BEFORE",
+		ScriptContents: "#!/bin/bash\n\n# Example script\necho \"Hello, world!\"\nexit 0",
+		Parameter4:     "Parameter 4 Label",
+		Parameter5:     "Parameter 5 Label",
+		Parameter6:     "Parameter 6 Label",
+		Parameter7:     "Parameter 7 Label",
+		Parameter8:     "Parameter 8 Label",
+		Parameter9:     "Parameter 9 Label",
+		Parameter10:    "Parameter 10 Label",
+		Parameter11:    "Parameter 11 Label",
+	}
+}
+
+func (s *ScriptsToolset) getScriptTemplate(ctx context.Context) (string, error) {
+	template := s.GetScriptTemplate()
+	response, err := FormatJSONResponse(template)
+	if err != nil {
+		return "", fmt.Errorf("failed to format script template: %w", err)
+	}
+	return fmt.Sprintf("Script template:\n\n%s", response), nil
 }

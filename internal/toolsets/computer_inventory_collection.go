@@ -18,7 +18,7 @@ type ComputerInventoryToolset struct {
 }
 
 // NewComputerInventoryToolset creates a new computer inventory toolset
-func NewComputerInventoryToolset(client *jamfpro.Client, logger *zap.Logger) *ComputerInventoryToolset {
+func NewComputerInventoryToolset(client JamfProClient, logger *zap.Logger) *ComputerInventoryToolset {
 	base := NewBaseToolset(
 		"computer-inventory",
 		"Tools for managing computer inventory using the Jamf Pro API, including detailed hardware/software inventory, FileVault, and device management",

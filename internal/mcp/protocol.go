@@ -219,18 +219,20 @@ type Handler interface {
 	HandleMessage(ctx context.Context, msg *Message) (*Message, error)
 }
 
-// Server represents the MCP server
+// Server represents the MCP server - FIXED with missing fields and methods
 type Server struct {
-	capabilities ServerCapabilities
-	serverInfo   ServerInfo
-	toolHandlers map[string]ToolHandler
-	initialized  bool
+	capabilities     ServerCapabilities
+	serverInfo       ServerInfo
+	toolHandlers     map[string]ToolHandler
+	toolRegistry     map[string]*Tool // ADDED: Store actual tool definitions
+	resourceProvider ResourceProvider
+	initialized      bool
 }
 
 // ToolHandler represents a tool handler function
 type ToolHandler func(ctx context.Context, params CallToolParams) (*CallToolResult, error)
 
-// NewServer creates a new MCP server
+// NewServer creates a new MCP server - FIXED to initialize all fields
 func NewServer(name, version string) *Server {
 	return &Server{
 		capabilities: ServerCapabilities{
@@ -239,7 +241,7 @@ func NewServer(name, version string) *Server {
 			},
 			Resources: &ResourcesCapabilities{
 				Subscribe:   false,
-				ListChanged: false,
+				ListChanged: true,
 			},
 			Logging: &LoggingCapabilities{},
 		},
@@ -248,13 +250,37 @@ func NewServer(name, version string) *Server {
 			Version: version,
 		},
 		toolHandlers: make(map[string]ToolHandler),
+		toolRegistry: make(map[string]*Tool), // ADDED: Initialize tool registry
 		initialized:  false,
 	}
+}
+
+// SetResourceProvider sets the resource provider for the server - ADDED missing method
+func (s *Server) SetResourceProvider(provider ResourceProvider) {
+	s.resourceProvider = provider
+}
+
+// GetRegisteredTools returns the list of registered tool names - ADDED missing method
+func (s *Server) GetRegisteredTools() []string {
+	tools := make([]string, 0, len(s.toolHandlers))
+	for name := range s.toolHandlers {
+		tools = append(tools, name)
+	}
+	return tools
 }
 
 // RegisterTool registers a tool handler
 func (s *Server) RegisterTool(name string, handler ToolHandler) {
 	s.toolHandlers[name] = handler
+}
+
+// RegisterToolDefinition registers a tool definition - ADDED to store schemas
+func (s *Server) RegisterToolDefinition(tool *Tool) {
+	if s.toolRegistry == nil {
+		s.toolRegistry = make(map[string]*Tool)
+	}
+	toolCopy := *tool // Make a copy to avoid pointer issues
+	s.toolRegistry[tool.Name] = &toolCopy
 }
 
 // HandleMessage handles an incoming MCP message
@@ -292,6 +318,28 @@ func (s *Server) HandleMessage(ctx context.Context, msg *Message) (*Message, err
 		if err != nil {
 			response.Error = &Error{
 				Code:    ToolExecutionError,
+				Message: err.Error(),
+			}
+		} else {
+			response.Result = result
+		}
+
+	case "resources/list":
+		result, err := s.handleListResources(ctx, msg.Params)
+		if err != nil {
+			response.Error = &Error{
+				Code:    InternalError,
+				Message: err.Error(),
+			}
+		} else {
+			response.Result = result
+		}
+
+	case "resources/read":
+		result, err := s.handleReadResource(ctx, msg.Params)
+		if err != nil {
+			response.Error = &Error{
+				Code:    ResourceNotFound,
 				Message: err.Error(),
 			}
 		} else {
@@ -361,10 +409,14 @@ func (s *Server) handleCallTool(ctx context.Context, params interface{}) (*CallT
 	return handler(ctx, callParams)
 }
 
-// getToolDefinition returns the tool definition for a given tool name
+// getToolDefinition returns the tool definition for a given tool name - FIXED to use registry
 func (s *Server) getToolDefinition(name string) *Tool {
-	// This will be implemented by the toolsets
-	// For now, return a basic definition
+	// Try to get from registry first
+	if tool, exists := s.toolRegistry[name]; exists {
+		return tool
+	}
+
+	// Fallback to basic definition
 	return &Tool{
 		Name:        name,
 		Description: fmt.Sprintf("Tool: %s", name),
@@ -374,4 +426,49 @@ func (s *Server) getToolDefinition(name string) *Tool {
 			Required:   []string{},
 		},
 	}
+}
+
+// handleListResources handles the resources/list method
+func (s *Server) handleListResources(ctx context.Context, params interface{}) (*ListResourcesResult, error) {
+	if !s.initialized {
+		return nil, fmt.Errorf("server not initialized")
+	}
+
+	if s.resourceProvider == nil {
+		return &ListResourcesResult{
+			Resources: []Resource{},
+		}, nil
+	}
+
+	resources, err := s.resourceProvider.ListResources()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list resources: %w", err)
+	}
+
+	return &ListResourcesResult{
+		Resources: resources,
+	}, nil
+}
+
+// handleReadResource handles the resources/read method
+func (s *Server) handleReadResource(ctx context.Context, params interface{}) (*ReadResourceResult, error) {
+	if !s.initialized {
+		return nil, fmt.Errorf("server not initialized")
+	}
+
+	if s.resourceProvider == nil {
+		return nil, fmt.Errorf("resource provider not configured")
+	}
+
+	var readParams ReadResourceParams
+	data, err := json.Marshal(params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal params: %w", err)
+	}
+
+	if err := json.Unmarshal(data, &readParams); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal read resource params: %w", err)
+	}
+
+	return s.resourceProvider.ReadResource(readParams.URI)
 }

@@ -15,7 +15,7 @@ type ComputersToolset struct {
 }
 
 // NewComputersToolset creates a new computers toolset
-func NewComputersToolset(client *jamfpro.Client, logger *zap.Logger) *ComputersToolset {
+func NewComputersToolset(client JamfProClient, logger *zap.Logger) *ComputersToolset {
 	base := NewBaseToolset(
 		"computers",
 		"Tools for managing computers in Jamf Pro using the Classic API, including CRUD operations and detailed computer information",
@@ -75,6 +75,33 @@ func (c *ComputersToolset) addTools() {
 				},
 			},
 			Required: []string{"name"},
+		},
+	})
+
+	// Get Computer Groups
+	c.AddTool(mcp.Tool{
+		Name:        "get_computer_groups",
+		Description: "Retrieve a list of all computer groups from Jamf Pro",
+		InputSchema: mcp.ToolInputSchema{
+			Type:       "object",
+			Properties: map[string]interface{}{},
+			Required:   []string{},
+		},
+	})
+
+	// Get Computer Group by ID
+	c.AddTool(mcp.Tool{
+		Name:        "get_computer_group_by_id",
+		Description: "Retrieve detailed information about a specific computer group by its ID",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"id": map[string]interface{}{
+					"type":        "string",
+					"description": "The ID of the computer group to retrieve",
+				},
+			},
+			Required: []string{"id"},
 		},
 	})
 
@@ -495,6 +522,17 @@ func (c *ComputersToolset) addTools() {
 			Required: []string{"name"},
 		},
 	})
+
+	// Get Computer Template
+	c.AddTool(mcp.Tool{
+		Name:        "get_computer_template",
+		Description: "Get a reference template for a computer resource showing all available fields",
+		InputSchema: mcp.ToolInputSchema{
+			Type:       "object",
+			Properties: map[string]interface{}{},
+			Required:   []string{},
+		},
+	})
 }
 
 // ExecuteTool executes a computer-related tool
@@ -508,6 +546,10 @@ func (c *ComputersToolset) ExecuteTool(ctx context.Context, toolName string, arg
 		return c.getComputerByID(ctx, arguments)
 	case "get_computer_by_name":
 		return c.getComputerByName(ctx, arguments)
+	case "get_computer_groups":
+		return c.getComputerGroups(ctx)
+	case "get_computer_group_by_id":
+		return c.getComputerGroupByID(ctx, arguments)
 	case "create_computer":
 		return c.createComputer(ctx, arguments)
 	case "update_computer_by_id":
@@ -518,6 +560,8 @@ func (c *ComputersToolset) ExecuteTool(ctx context.Context, toolName string, arg
 		return c.deleteComputerByID(ctx, arguments)
 	case "delete_computer_by_name":
 		return c.deleteComputerByName(ctx, arguments)
+	case "get_computer_template":
+		return c.getComputerTemplate(ctx)
 	default:
 		return "", fmt.Errorf("unknown tool: %s", toolName)
 	}
@@ -578,6 +622,41 @@ func (c *ComputersToolset) getComputerByName(ctx context.Context, args map[strin
 	}
 
 	return fmt.Sprintf("Computer details for name '%s':\n\n%s", name, response), nil
+}
+
+// getComputerGroups retrieves all computer groups
+func (c *ComputersToolset) getComputerGroups(ctx context.Context) (string, error) {
+	groups, err := c.GetClient().GetComputerGroups()
+	if err != nil {
+		return "", fmt.Errorf("failed to get computer groups: %w", err)
+	}
+
+	response, err := FormatJSONResponse(groups)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("Computer groups:\n\n%s", response), nil
+}
+
+// getComputerGroupByID retrieves a computer group by ID
+func (c *ComputersToolset) getComputerGroupByID(ctx context.Context, args map[string]interface{}) (string, error) {
+	id, err := GetStringArgument(args, "id", true)
+	if err != nil {
+		return "", err
+	}
+
+	group, err := c.GetClient().GetComputerGroupByID(id)
+	if err != nil {
+		return "", fmt.Errorf("failed to get computer group with ID %s: %w", id, err)
+	}
+
+	response, err := FormatJSONResponse(group)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("Computer group details for ID %s:\n\n%s", id, response), nil
 }
 
 // createComputer creates a new computer record
@@ -773,7 +852,7 @@ func (c *ComputersToolset) updateComputerByID(ctx context.Context, args map[stri
 			computer.Purchasing.IsPurchased = purchasedBool
 		}
 	}
-	if isLeased, ok := args["is_leased"]; ok {
+	if _, ok := args["is_leased"]; ok {
 		if leasedBool, _ := GetBoolArgument(args, "is_leased", false); ok {
 			computer.Purchasing.IsLeased = leasedBool
 		}
@@ -890,12 +969,12 @@ func (c *ComputersToolset) updateComputerByName(ctx context.Context, args map[st
 	}
 
 	// Purchasing information updates (same logic as updateByID)
-	if isPurchased, ok := args["is_purchased"]; ok {
+	if _, ok := args["is_purchased"]; ok {
 		if purchasedBool, _ := GetBoolArgument(args, "is_purchased", false); ok {
 			computer.Purchasing.IsPurchased = purchasedBool
 		}
 	}
-	if isLeased, ok := args["is_leased"]; ok {
+	if _, ok := args["is_leased"]; ok {
 		if leasedBool, _ := GetBoolArgument(args, "is_leased", false); ok {
 			computer.Purchasing.IsLeased = leasedBool
 		}
@@ -972,4 +1051,106 @@ func (c *ComputersToolset) deleteComputerByName(ctx context.Context, args map[st
 	}
 
 	return fmt.Sprintf("Successfully deleted computer with name '%s'", name), nil
+}
+
+// GetComputerTemplate returns an example template of a computer resource
+func (c *ComputersToolset) GetComputerTemplate() *jamfpro.ResponseComputer {
+	return &jamfpro.ResponseComputer{
+		General: jamfpro.ComputerSubsetGeneral{
+			Name:         "Example-MacBook-Pro",
+			MacAddress:   "AA:BB:CC:DD:EE:FF",
+			SerialNumber: "C02Q7KHTGFW2",
+			UDID:         "EBBFF74D-C6B7-5589-93A9-19E8BDFECF02",
+			IPAddress:    "192.168.1.100",
+			AssetTag:     "ASSET123",
+			Barcode1:     "BC12345",
+			Barcode2:     "BC67890",
+			RemoteManagement: jamfpro.ComputerSubsetGeneralRemoteManagement{
+				Managed:            true,
+				ManagementUsername: "jamfadmin",
+			},
+			MdmCapable: true,
+			Site: jamfpro.SharedResourceSite{
+				ID:   -1,
+				Name: "None",
+			},
+		},
+		Location: jamfpro.ComputerSubsetLocation{
+			Username:     "jdoe",
+			RealName:     "John Doe",
+			EmailAddress: "john.doe@example.com",
+			Position:     "Software Developer",
+			Phone:        "+1 (555) 123-4567",
+			Department:   "Engineering",
+			Building:     "Main Campus",
+			Room:         "101",
+		},
+		Purchasing: jamfpro.ComputerSubsetPurchasing{
+			IsPurchased:       true,
+			IsLeased:          false,
+			PoNumber:          "PO-12345",
+			Vendor:            "Apple",
+			ApplecareID:       "AC-987654",
+			PurchasePrice:     "$1,999.00",
+			PurchasingAccount: "IT-DEPT",
+			PoDate:            "2023-01-15",
+			WarrantyExpires:   "2026-01-15",
+			LeaseExpires:      "",
+			PurchasingContact: "procurement@example.com",
+			LifeExpectancy:    4,
+		},
+		Hardware: jamfpro.ComputerSubsetHardware{
+			Make:              "Apple",
+			Model:             "MacBook Pro",
+			ModelIdentifier:   "MacBookPro16,1",
+			OsName:            "macOS",
+			OsVersion:         "13.0.0",
+			OsBuild:           "22A380",
+			MasterPasswordSet: false,
+			ProcessorType:     "Apple M1 Pro",
+			ProcessorSpeed:    3200,
+			ProcessorSpeedMhz: 3200,
+			NumberCores:       10,
+			TotalRam:          16384,
+			TotalRamMb:        16384,
+			BootRom:           "7429.41.5",
+			BleCapable:        true,
+			SipStatus:         "Enabled",
+			GatekeeperStatus:  "Enabled",
+			XprotectVersion:   "2150",
+			IsAppleSilicon:    true,
+			Storage: []jamfpro.ComputerSubsetHardwareStorage{
+				{
+					Disk:            "disk0",
+					Model:           "APPLE SSD AP0512Q",
+					SerialNumber:    "S123456789",
+					Size:            512,
+					DriveCapacityMb: 512000,
+					ConnectionType:  "PCI",
+					SmartStatus:     "Verified",
+					Partitions: []jamfpro.ComputerSubsetHardwareStoragePartitions{
+						{
+							Name:                 "Macintosh HD",
+							Size:                 512,
+							Type:                 "APFS",
+							PartitionCapacityMb:  512000,
+							PercentageFull:       60,
+							Filevault2Status:     "Enabled",
+							Filevault2Percent:    100,
+							BootDriveAvailableMb: 204800,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (c *ComputersToolset) getComputerTemplate(ctx context.Context) (string, error) {
+	template := c.GetComputerTemplate()
+	response, err := FormatJSONResponse(template)
+	if err != nil {
+		return "", fmt.Errorf("failed to format computer template: %w", err)
+	}
+	return fmt.Sprintf("Computer template:\n\n%s", response), nil
 }

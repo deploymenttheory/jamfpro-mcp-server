@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/deploymenttheory/go-api-sdk-jamfpro/sdk/jamfpro"
@@ -45,6 +46,12 @@ func New(cfg *config.Config, logger *zap.Logger) (*Server, error) {
 	// Initialize toolsets
 	if err := server.initializeToolsets(); err != nil {
 		return nil, fmt.Errorf("failed to initialize toolsets: %w", err)
+	}
+
+	// Initialize resource provider
+	if err := server.initializeResourceProvider(); err != nil {
+		logger.Warn("Failed to initialize resource provider", zap.Error(err))
+		// Continue anyway, resources are optional
 	}
 
 	return server, nil
@@ -160,8 +167,13 @@ func initializeJamfClient(cfg *config.Config, logger *zap.Logger) (*jamfpro.Clie
 	return client, nil
 }
 
-// setJamfEnvironmentVariables sets environment variables for the Jamf Pro SDK
+// setJamfEnvironmentVariables sets environment variables for the Jamf Pro SDK - FIXED with validation
 func setJamfEnvironmentVariables(cfg *config.Config) error {
+	// Validate URL format first
+	if !isValidURL(cfg.JamfInstanceURL) {
+		return fmt.Errorf("invalid Jamf instance URL format: %s", cfg.JamfInstanceURL)
+	}
+
 	envVars := map[string]string{
 		"INSTANCE_DOMAIN":                     cfg.JamfInstanceURL,
 		"AUTH_METHOD":                         cfg.AuthMethod,
@@ -180,14 +192,28 @@ func setJamfEnvironmentVariables(cfg *config.Config) error {
 		"JAMF_LOAD_BALANCER_LOCK":             fmt.Sprintf("%t", cfg.JamfLoadBalancerLock),
 	}
 
+	// Add auth-specific variables with validation
 	if cfg.AuthMethod == "oauth2" {
+		if cfg.JamfClientID == "" {
+			return fmt.Errorf("client ID is required for OAuth2 authentication")
+		}
+		if cfg.JamfClientSecret == "" {
+			return fmt.Errorf("client secret is required for OAuth2 authentication")
+		}
 		envVars["CLIENT_ID"] = cfg.JamfClientID
 		envVars["CLIENT_SECRET"] = cfg.JamfClientSecret
 	} else {
+		if cfg.JamfUsername == "" {
+			return fmt.Errorf("username is required for basic authentication")
+		}
+		if cfg.JamfPassword == "" {
+			return fmt.Errorf("password is required for basic authentication")
+		}
 		envVars["BASIC_AUTH_USERNAME"] = cfg.JamfUsername
 		envVars["BASIC_AUTH_PASSWORD"] = cfg.JamfPassword
 	}
 
+	// Set all environment variables
 	for key, value := range envVars {
 		if err := os.Setenv(key, value); err != nil {
 			return fmt.Errorf("failed to set environment variable %s: %w", key, err)
@@ -195,6 +221,12 @@ func setJamfEnvironmentVariables(cfg *config.Config) error {
 	}
 
 	return nil
+}
+
+// isValidURL validates URL format - ADDED helper function
+func isValidURL(str string) bool {
+	u, err := url.Parse(str)
+	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
 // initializeToolsets initializes the available toolsets
@@ -221,9 +253,10 @@ func (s *Server) initializeToolsets() error {
 
 		s.toolsets[toolsetName] = toolset
 
-		// Register tools from this toolset
 		tools := toolset.GetTools()
 		for _, tool := range tools {
+			s.mcpServer.RegisterToolDefinition(&tool)
+
 			s.mcpServer.RegisterTool(tool.Name, s.createToolHandler(toolset, tool.Name))
 			s.logger.Debug("Registered tool",
 				zap.String("toolset", toolsetName),
@@ -244,9 +277,9 @@ func (s *Server) getEnabledToolsets() []string {
 	for _, toolset := range s.config.Toolsets {
 		if toolset == "all" {
 			return []string{
-				"computers", "mobile-devices", "policies", "users", "groups",
-				"configuration-profiles", "scripts", "buildings", "departments",
-				"categories", "sites", "api-roles", "api-integrations",
+				"computers", "computer-inventory", "mobile-devices", "policies",
+				"scripts", "users", "groups", "configuration-profiles", "buildings",
+				"departments", "categories", "sites", "api-roles", "api-integrations",
 				"inventory", "packages", "printers", "network-segments",
 				"webhooks", "vpp", "advanced-searches", "extension-attributes",
 				"ldap", "self-service", "patch-management", "mobile-applications",
@@ -295,4 +328,87 @@ func (s *Server) createToolHandler(toolset toolsets.Toolset, toolName string) mc
 			IsError: false,
 		}, nil
 	}
+}
+
+// initializeResourceProvider initializes the resource provider
+func (s *Server) initializeResourceProvider() error {
+	s.logger.Info("Initializing resource provider")
+
+	// Create a file resource provider with the current working directory as base path
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	resourceProvider := mcp.NewFileResourceProvider(wd)
+
+	// Register common resource directories
+	if err := s.registerCommonResourceDirectories(resourceProvider); err != nil {
+		return fmt.Errorf("failed to register resource directories: %w", err)
+	}
+
+	// Set the resource provider on the MCP server
+	s.mcpServer.SetResourceProvider(resourceProvider)
+
+	s.logger.Info("Resource provider initialized")
+	return nil
+}
+
+// registerCommonResourceDirectories registers commonly used directories as resources
+func (s *Server) registerCommonResourceDirectories(provider *mcp.FileResourceProvider) error {
+	// Register templates directory if it exists
+	if dirExists("templates") {
+		if err := provider.RegisterDirectory("file://templates", "templates"); err != nil {
+			s.logger.Warn("Failed to register templates directory", zap.Error(err))
+		} else {
+			s.logger.Info("Registered templates directory as resource")
+		}
+	}
+
+	// Register examples directory if it exists
+	if dirExists("examples") {
+		if err := provider.RegisterDirectory("file://examples", "examples"); err != nil {
+			s.logger.Warn("Failed to register examples directory", zap.Error(err))
+		} else {
+			s.logger.Info("Registered examples directory as resource")
+		}
+	}
+
+	// Register scripts directory if it exists
+	if dirExists("scripts") {
+		if err := provider.RegisterDirectory("file://scripts", "scripts"); err != nil {
+			s.logger.Warn("Failed to register scripts directory", zap.Error(err))
+		} else {
+			s.logger.Info("Registered scripts directory as resource")
+		}
+	}
+
+	// Register workflows directory if it exists
+	if dirExists("workflows") {
+		if err := provider.RegisterDirectory("file://workflows", "workflows"); err != nil {
+			s.logger.Warn("Failed to register workflows directory", zap.Error(err))
+		} else {
+			s.logger.Info("Registered workflows directory as resource")
+		}
+	}
+
+	// Register docs directory if it exists
+	if dirExists("docs") {
+		if err := provider.RegisterDirectory("file://docs", "docs"); err != nil {
+			s.logger.Warn("Failed to register docs directory", zap.Error(err))
+		} else {
+			s.logger.Info("Registered docs directory as resource")
+		}
+	}
+
+	return nil
+}
+
+// dirExists checks if a directory exists at the given path
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }
