@@ -263,7 +263,7 @@ func TestGetMobileDeviceGroups(t *testing.T) {
 
 	// Set up the mock client
 	mockClient.On("GetMobileDeviceGroups").Return(&jamfpro.ResponseMobileDeviceGroupsList{
-		MobileDeviceGroups: []jamfpro.MobileDeviceGroupsListItem{
+		MobileDeviceGroup: []jamfpro.MobileDeviceGroupsListItem{
 			{
 				ID:   1,
 				Name: "iOS Devices",

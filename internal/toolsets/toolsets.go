@@ -22,7 +22,7 @@ type JamfProClient interface {
 	GetComputerByID(id string) (*jamfpro.ResponseComputer, error)
 	GetComputerByName(name string) (*jamfpro.ResponseComputer, error)
 	GetComputerGroups() (*jamfpro.ResponseComputerGroupsList, error)
-	GetComputerGroupByID(id string) (*jamfpro.ResponseComputerGroup, error)
+	GetComputerGroupByID(id string) (*jamfpro.ResourceComputerGroup, error)
 	CreateComputer(computer jamfpro.ResponseComputer) (*jamfpro.ResponseComputer, error)
 	UpdateComputerByID(id string, computer jamfpro.ResponseComputer) (*jamfpro.ResponseComputer, error)
 	UpdateComputerByName(name string, computer jamfpro.ResponseComputer) (*jamfpro.ResponseComputer, error)
@@ -30,23 +30,23 @@ type JamfProClient interface {
 	DeleteComputerByName(name string) error
 
 	// Computer Inventory methods (Pro API)
-	GetComputersInventory(params url.Values) (*jamfpro.ResponseComputersInventory, error)
+	GetComputersInventory(params url.Values) (*jamfpro.ResponseComputerInventoryList, error)
 	GetComputerInventoryByID(id string) (*jamfpro.ResourceComputerInventory, error)
 	GetComputerInventoryByName(name string) (*jamfpro.ResourceComputerInventory, error)
 	UpdateComputerInventoryByID(id string, inventory *jamfpro.ResourceComputerInventory) (*jamfpro.ResourceComputerInventory, error)
 	DeleteComputerInventoryByID(id string) error
 
 	// FileVault methods
-	GetComputersFileVaultInventory(params url.Values) (*jamfpro.ResponseComputersFileVaultInventory, error)
-	GetComputerFileVaultInventoryByID(id string) (*jamfpro.ResourceComputerFileVaultInventory, error)
-	GetComputerRecoveryLockPasswordByID(id string) (*jamfpro.ResponseComputerRecoveryLockPassword, error)
+	GetComputersFileVaultInventory(params url.Values) (*jamfpro.FileVaultInventoryList, error)
+	GetComputerFileVaultInventoryByID(id string) (*jamfpro.FileVaultInventory, error)
+	GetComputerRecoveryLockPasswordByID(id string) (*jamfpro.ResponseRecoveryLockPassword, error)
 
 	// Device management methods
-	RemoveComputerMDMProfile(id string) (*jamfpro.ResponseComputerMDMCommand, error)
+	RemoveComputerMDMProfile(id string) (*jamfpro.ResponseRemoveMDMProfile, error)
 	EraseComputerByID(id string, request jamfpro.RequestEraseDeviceComputer) error
 
 	// Attachment methods
-	UploadAttachmentAndAssignToComputerByID(computerID string, filePaths []string) (*jamfpro.ResponseComputerAttachment, error)
+	UploadAttachmentAndAssignToComputerByID(computerID string, filePaths []string) (*jamfpro.ResponseUploadAttachment, error)
 	DeleteAttachmentByIDAndComputerID(computerID, attachmentID string) error
 
 	// Mobile Device methods (Classic API)
@@ -54,7 +54,7 @@ type JamfProClient interface {
 	GetMobileDeviceByID(id string) (*jamfpro.ResourceMobileDevice, error)
 	GetMobileDeviceByName(name string) (*jamfpro.ResourceMobileDevice, error)
 	GetMobileDeviceGroups() (*jamfpro.ResponseMobileDeviceGroupsList, error)
-	GetMobileDeviceGroupByID(id string) (*jamfpro.ResponseMobileDeviceGroup, error)
+	GetMobileDeviceGroupByID(id string) (*jamfpro.ResourceMobileDeviceGroup, error)
 	GetMobileDeviceApplications() (*jamfpro.ResponseMobileDeviceApplicationsList, error)
 	GetMobileDeviceConfigurationProfiles() (*jamfpro.ResponseMobileDeviceConfigurationProfilesList, error)
 	CreateMobileDevice(device *jamfpro.ResourceMobileDevice) (*jamfpro.ResourceMobileDevice, error)
@@ -74,7 +74,7 @@ type JamfProClient interface {
 	DeletePolicyByName(name string) error
 
 	// Scripts methods (Pro API)
-	GetScripts(params ...url.Values) (*jamfpro.ResponseScriptsList, error)
+	GetScripts(params url.Values) (*jamfpro.ResponseScriptsList, error)
 	GetScriptByID(id string) (*jamfpro.ResourceScript, error)
 	GetScriptByName(name string) (*jamfpro.ResourceScript, error)
 	CreateScript(script *jamfpro.ResourceScript) (*jamfpro.ResponseScriptCreate, error)

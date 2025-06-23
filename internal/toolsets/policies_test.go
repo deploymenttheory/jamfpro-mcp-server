@@ -2,6 +2,7 @@ package toolsets
 
 import (
 	"context"
+	"net/url"
 	"testing"
 
 	"github.com/deploymenttheory/go-api-sdk-jamfpro/sdk/jamfpro"
@@ -126,7 +127,7 @@ func (m *PolicyClientAdapter) GetComputerGroups() (*jamfpro.ResponseComputerGrou
 	return nil, nil
 }
 
-func (m *PolicyClientAdapter) GetComputerGroupByID(id string) (interface{}, error) {
+func (m *PolicyClientAdapter) GetComputerGroupByID(id string) (*jamfpro.ResourceComputerGroup, error) {
 	return nil, nil
 }
 
@@ -151,7 +152,7 @@ func (m *PolicyClientAdapter) DeleteComputerByName(name string) error {
 }
 
 // Implement the rest of the interface methods with nil responses for our test
-func (m *PolicyClientAdapter) GetComputersInventory(params interface{}) (interface{}, error) {
+func (m *PolicyClientAdapter) GetComputersInventory(params url.Values) (*jamfpro.ResponseComputerInventoryList, error) {
 	return nil, nil
 }
 
@@ -171,19 +172,19 @@ func (m *PolicyClientAdapter) DeleteComputerInventoryByID(id string) error {
 	return nil
 }
 
-func (m *PolicyClientAdapter) GetComputersFileVaultInventory(params interface{}) (interface{}, error) {
+func (m *PolicyClientAdapter) GetComputersFileVaultInventory(params url.Values) (*jamfpro.FileVaultInventoryList, error) {
 	return nil, nil
 }
 
-func (m *PolicyClientAdapter) GetComputerFileVaultInventoryByID(id string) (interface{}, error) {
+func (m *PolicyClientAdapter) GetComputerFileVaultInventoryByID(id string) (*jamfpro.FileVaultInventory, error) {
 	return nil, nil
 }
 
-func (m *PolicyClientAdapter) GetComputerRecoveryLockPasswordByID(id string) (interface{}, error) {
+func (m *PolicyClientAdapter) GetComputerRecoveryLockPasswordByID(id string) (*jamfpro.ResponseRecoveryLockPassword, error) {
 	return nil, nil
 }
 
-func (m *PolicyClientAdapter) RemoveComputerMDMProfile(id string) (interface{}, error) {
+func (m *PolicyClientAdapter) RemoveComputerMDMProfile(id string) (*jamfpro.ResponseRemoveMDMProfile, error) {
 	return nil, nil
 }
 
@@ -191,7 +192,7 @@ func (m *PolicyClientAdapter) EraseComputerByID(id string, request jamfpro.Reque
 	return nil
 }
 
-func (m *PolicyClientAdapter) UploadAttachmentAndAssignToComputerByID(computerID string, filePaths []string) (interface{}, error) {
+func (m *PolicyClientAdapter) UploadAttachmentAndAssignToComputerByID(computerID string, filePaths []string) (*jamfpro.ResponseUploadAttachment, error) {
 	return nil, nil
 }
 
@@ -215,7 +216,7 @@ func (m *PolicyClientAdapter) GetMobileDeviceGroups() (*jamfpro.ResponseMobileDe
 	return nil, nil
 }
 
-func (m *PolicyClientAdapter) GetMobileDeviceGroupByID(id string) (interface{}, error) {
+func (m *PolicyClientAdapter) GetMobileDeviceGroupByID(id string) (*jamfpro.ResourceMobileDeviceGroup, error) {
 	return nil, nil
 }
 
@@ -239,7 +240,7 @@ func (m *PolicyClientAdapter) DeleteMobileDeviceByID(id string) error {
 	return nil
 }
 
-func (m *PolicyClientAdapter) GetScripts(params ...interface{}) (*jamfpro.ResponseScriptsList, error) {
+func (m *PolicyClientAdapter) GetScripts(params url.Values) (*jamfpro.ResponseScriptsList, error) {
 	return nil, nil
 }
 

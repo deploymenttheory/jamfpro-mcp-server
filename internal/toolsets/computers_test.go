@@ -2,6 +2,7 @@ package toolsets
 
 import (
 	"context"
+	"net/url"
 	"testing"
 
 	"github.com/deploymenttheory/go-api-sdk-jamfpro/sdk/jamfpro"
@@ -81,6 +82,15 @@ func (m *MockJamfProClient) DeleteComputerByName(name string) error {
 func (m *MockJamfProClient) GetJamfProInformation() (*jamfpro.ResponseJamfProInformation, error) {
 	args := m.Called()
 	return args.Get(0).(*jamfpro.ResponseJamfProInformation), args.Error(1)
+}
+
+// GetScripts mocks the GetScripts method
+func (m *MockJamfProClient) GetScripts(params url.Values) (*jamfpro.ResponseScriptsList, error) {
+	args := m.Called(params)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*jamfpro.ResponseScriptsList), args.Error(1)
 }
 
 // TestNewComputersToolset tests the NewComputersToolset function
