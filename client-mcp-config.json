@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "jamfpro": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e", "JAMF_INSTANCE_URL=https://your-instance.jamfcloud.com",
+        "-e", "JAMF_CLIENT_ID=${input:jamf_client_id}",
+        "-e", "JAMF_CLIENT_SECRET=${input:jamf_client_secret}",
+        "ghcr.io/deploymenttheory/jamfpro-mcp-server:latest"
+      ],
+      "env": {
+        "JAMF_CLIENT_ID": "${input:jamf_client_id}",
+        "JAMF_CLIENT_SECRET": "${input:jamf_client_secret}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "jamf_client_id",
+      "description": "Jamf Pro Client ID",
+      "password": true
+    },
+    {
+      "type": "promptString",
+      "id": "jamf_client_secret",
+      "description": "Jamf Pro Client Secret",
+      "password": true
+    }
+  ]
+} 

@@ -1,0 +1,9 @@
+{
+  "jamf_instance_url": "https://your-instance.jamfcloud.com",
+  "auth_method": "oauth2",
+  "client_id": "your-client-id",
+  "client_secret": "your-client-secret",
+  "log_level": "info",
+  "toolsets": ["all"],
+  "dynamic_toolsets": false
+} 
