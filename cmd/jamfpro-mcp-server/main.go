@@ -53,20 +53,18 @@ func main() {
 }
 
 func runServer(cmd *cobra.Command, args []string) {
-	// Load configuration
+
 	cfg, err := config.Load(cmd)
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Initialize logger
 	logger, err := initLogger(cfg.LogLevel)
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 	defer logger.Sync()
 
-	// Handle export translations
 	if cfg.ExportTranslations {
 		if err := exportTranslations(logger); err != nil {
 			logger.Fatal("Failed to export translations", zap.Error(err))
@@ -74,7 +72,6 @@ func runServer(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Validate toolsets
 	if err := validateToolsets(cfg.Toolsets); err != nil {
 		logger.Fatal("Invalid toolsets", zap.Error(err))
 	}
@@ -106,7 +103,6 @@ func runServer(cmd *cobra.Command, args []string) {
 		errChan <- mcpServer.Start(ctx)
 	}()
 
-	// Wait for shutdown signal or error
 	select {
 	case sig := <-sigChan:
 		logger.Info("Received shutdown signal", zap.String("signal", sig.String()))
@@ -207,11 +203,10 @@ func exportTranslations(logger *zap.Logger) error {
 
 	configFile := "jamfpro-mcp-server-config.json"
 
-	// Check if file exists and load existing translations
 	if data, err := os.ReadFile(configFile); err == nil {
 		var existing map[string]string
 		if err := json.Unmarshal(data, &existing); err == nil {
-			// Merge existing with defaults, keeping existing values
+
 			for key, value := range existing {
 				translations[key] = value
 			}

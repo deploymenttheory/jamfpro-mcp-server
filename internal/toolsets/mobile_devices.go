@@ -606,7 +606,6 @@ func (m *MobileDevicesToolset) createMobileDevice(ctx context.Context, args map[
 		}
 	}
 
-	// Purchasing fields - FIXED: Set fields directly without condition checks
 	if poNumber, ok := args["po_number"].(string); ok && poNumber != "" {
 		device.Purchasing.PONumber = poNumber
 	}
@@ -651,7 +650,6 @@ func (m *MobileDevicesToolset) createMobileDevice(ctx context.Context, args map[
 		device.Purchasing.IsLeased = isLeased
 	}
 
-	// Create the mobile device
 	createdDevice, err := m.GetClient().CreateMobileDevice(device)
 	if err != nil {
 		return "", fmt.Errorf("failed to create mobile device: %w", err)
@@ -666,13 +664,11 @@ func (m *MobileDevicesToolset) updateMobileDeviceByID(ctx context.Context, args 
 		return "", err
 	}
 
-	// First, get the existing device
 	existingDevice, err := m.GetClient().GetMobileDeviceByID(id)
 	if err != nil {
 		return "", fmt.Errorf("failed to get mobile device with ID %s: %w", id, err)
 	}
 
-	// Update General fields if provided
 	if name, ok := args["name"].(string); ok && name != "" {
 		existingDevice.General.DisplayName = name
 		existingDevice.General.DeviceName = name
@@ -703,7 +699,6 @@ func (m *MobileDevicesToolset) updateMobileDeviceByID(ctx context.Context, args 
 		existingDevice.General.BluetoothMacAddress = bluetoothMacAddress
 	}
 
-	// Update Location fields if provided
 	if username, ok := args["username"].(string); ok {
 		existingDevice.Location.Username = username
 	}
@@ -729,14 +724,12 @@ func (m *MobileDevicesToolset) updateMobileDeviceByID(ctx context.Context, args 
 	}
 
 	if roomStr, ok := args["room"].(string); ok && roomStr != "" {
-		// Convert room string to int if possible
 		var room int
 		if _, err := fmt.Sscanf(roomStr, "%d", &room); err == nil {
 			existingDevice.Location.Room = room
 		}
 	}
 
-	// Update Purchasing fields if provided
 	if poNumber, ok := args["po_number"].(string); ok {
 		existingDevice.Purchasing.PONumber = poNumber
 	}
@@ -781,7 +774,6 @@ func (m *MobileDevicesToolset) updateMobileDeviceByID(ctx context.Context, args 
 		existingDevice.Purchasing.IsLeased = isLeased
 	}
 
-	// Update the mobile device
 	_, err = m.GetClient().UpdateMobileDeviceByID(id, existingDevice)
 	if err != nil {
 		return "", fmt.Errorf("failed to update mobile device with ID %s: %w", id, err)

@@ -29,7 +29,6 @@ func NewScriptsToolset(client JamfProClient, logger *zap.Logger) *ScriptsToolset
 		BaseToolset: base,
 	}
 
-	// Add tools based on actual Pro API capabilities
 	toolset.addTools()
 
 	return toolset
